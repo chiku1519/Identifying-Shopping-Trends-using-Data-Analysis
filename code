@@ -1,0 +1,116 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+
+# Static data (hardcoded)
+data = {
+    'Date': pd.to_datetime([
+        '2023-01-01', '2023-01-02', '2023-01-03', '2023-01-04', '2023-01-05',
+        '2023-02-01', '2023-02-02', '2023-02-03', '2023-02-04', '2023-02-05',
+        '2023-03-01', '2023-03-02', '2023-03-03', '2023-03-04', '2023-03-05'
+    ]),
+    'Product': ['Product A', 'Product B', 'Product C', 'Product A', 'Product B',
+                'Product C', 'Product A', 'Product B', 'Product C', 'Product A',
+                'Product B', 'Product C', 'Product A', 'Product B', 'Product C'],
+    'Price': [10, 15, 20, 10, 15, 20, 10, 15, 20, 10, 15, 20, 10, 15, 20],
+    'Quantity Sold': [5, 3, 7, 8, 6, 9, 4, 5, 3, 7, 2, 6, 4, 5, 3],
+    'Customer ID': ['C001', 'C002', 'C003', 'C004', 'C005', 'C006', 'C007', 'C008', 'C009', 'C010', 'C011', 'C012', 'C013', 'C014', 'C015']
+}
+
+# Create DataFrame
+df = pd.DataFrame(data)
+
+# Step 1: Data Preprocessing (Ensure no missing values and check types)
+df.isnull().sum()  # Check for missing values
+df.drop_duplicates(inplace=True)  # Remove duplicates
+
+# Create additional columns for Year, Month, and Day
+df['Year'] = df['Date'].dt.year
+df['Month'] = df['Date'].dt.month
+df['Day'] = df['Date'].dt.day
+
+# Step 2: Exploratory Data Analysis (EDA)
+# Basic statistics
+print("Basic Statistics:\n", df.describe())
+
+# Plotting quantity sold over time
+plt.figure(figsize=(10,6))
+plt.plot(df['Date'], df['Quantity Sold'], label='Quantity Sold', color='blue')
+plt.title('Quantity Sold Over Time')
+plt.xlabel('Date')
+plt.ylabel('Quantity Sold')
+plt.xticks(rotation=45)
+plt.legend()
+plt.show()
+
+# Plotting total quantity sold by product
+product_sales = df.groupby('Product')['Quantity Sold'].sum().sort_values(ascending=False)
+plt.figure(figsize=(10,6))
+product_sales.plot(kind='bar', color='orange')
+plt.title('Total Quantity Sold by Product')
+plt.ylabel('Quantity Sold')
+plt.show()
+
+# Step 3: Identifying Seasonal Trends (Sales by month)
+monthly_sales = df.groupby('Month')['Quantity Sold'].sum()
+plt.figure(figsize=(10,6))
+monthly_sales.plot(kind='line', color='green')
+plt.title('Sales Trends by Month')
+plt.xlabel('Month')
+plt.ylabel('Quantity Sold')
+plt.xticks(range(1, 13))
+plt.show()
+
+# Step 4: Clustering Customer Segments based on Purchase Behavior
+# Calculate total spending per customer (Quantity Sold * Price)
+df['Total Spending'] = df['Quantity Sold'] * df['Price']
+customer_data = df.groupby('Customer ID').agg({'Quantity Sold': 'sum', 'Total Spending': 'sum'})
+
+# Standardize the data
+scaler = StandardScaler()
+customer_data_scaled = scaler.fit_transform(customer_data[['Quantity Sold', 'Total Spending']])
+
+# Apply KMeans Clustering
+kmeans = KMeans(n_clusters=3)
+customer_data['Cluster'] = kmeans.fit_predict(customer_data_scaled)
+
+# Visualizing the clusters
+plt.figure(figsize=(10,6))
+sns.scatterplot(x='Quantity Sold', y='Total Spending', hue='Cluster', data=customer_data, palette='viridis')
+plt.title('Customer Segments Based on Purchase Behavior')
+plt.show()
+
+# Step 5: Predicting Future Trends (Linear Regression)
+# Using monthly sales for trend prediction
+monthly_sales_df = monthly_sales.reset_index()
+X = monthly_sales_df['Month'].values.reshape(-1, 1)  # Feature: Month
+y = monthly_sales_df['Quantity Sold'].values  # Target: Sales Quantity
+
+# Split data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train the linear regression model
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = model.predict(X_test)
+
+# Plotting the predictions vs actual values
+plt.figure(figsize=(10,6))
+plt.scatter(X_test, y_test, color='blue', label='Actual Sales')
+plt.plot(X_test, y_pred, color='red', label='Predicted Sales')
+plt.title('Predicted vs Actual Sales')
+plt.xlabel('Month')
+plt.ylabel('Quantity Sold')
+plt.legend()
+plt.show()
+
+# Model performance
+print(f"R-squared score: {model.score(X_test, y_test)}")
+
